@@ -1,0 +1,108 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String            @id @default(uuid())
+  email           String            @unique
+  name            String            @default("")
+  age             Int               @default(0)
+  gender          String            @default("other") // "male" | "female" | "other"
+  bio             String?
+  photoUrl        String?
+  vibeStatus      String            @default("Open to chat") // "Open to chat" | "Just browsing" | "Busy"
+  isVerified      Boolean           @default(false)
+  shadowBanned    Boolean           @default(false)
+  reportCount     Int               @default(0)
+  fcmToken        String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  sentRequests    ChatRequest[]     @relation("sender")
+  receivedRequests ChatRequest[]    @relation("receiver")
+  participations  ChatParticipant[]
+  reports         Report[]          @relation("reporter")
+  blockedUsers    Block[]           @relation("blocker")
+  blockedBy       Block[]           @relation("blocked")
+}
+
+model ChatRequest {
+  id           String   @id @default(uuid())
+  senderId     String
+  receiverId   String
+  identityMode String   // "full" | "semi" | "anonymous"
+  message      String   // max 100 chars icebreaker
+  topicTag     String?  // "music" | "hangout" | "networking" | "general"
+  status       String   @default("pending") // "pending" | "accepted" | "declined" | "expired"
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  sender       User     @relation("sender", fields: [senderId], references: [id])
+  receiver     User     @relation("receiver", fields: [receiverId], references: [id])
+  chat         Chat?
+
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([status])
+}
+
+model Chat {
+  id           String            @id @default(uuid())
+  requestId    String            @unique
+  expiresAt    DateTime          // 24hr from creation
+  createdAt    DateTime          @default(now())
+  isActive     Boolean           @default(true)
+  request      ChatRequest       @relation(fields: [requestId], references: [id])
+  participants ChatParticipant[]
+  messages     Message[]
+
+  @@index([expiresAt])
+}
+
+model ChatParticipant {
+  id      String @id @default(uuid())
+  chatId  String
+  userId  String
+  chat    Chat   @relation(fields: [chatId], references: [id])
+  user    User   @relation(fields: [userId], references: [id])
+
+  @@unique([chatId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  chatId    String
+  senderId  String
+  content   String
+  createdAt DateTime @default(now())
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@index([chatId])
+}
+
+model Report {
+  id           String   @id @default(uuid())
+  reporterId   String
+  reportedId   String
+  reason       String   // "inappropriate" | "spam" | "harassment" | "other"
+  createdAt    DateTime @default(now())
+  reporter     User     @relation("reporter", fields: [reporterId], references: [id])
+
+  @@index([reportedId])
+}
+
+model Block {
+  id        String @id @default(uuid())
+  blockerId String
+  blockedId String
+  blocker   User   @relation("blocker", fields: [blockerId], references: [id])
+  blocked   User   @relation("blocked", fields: [blockedId], references: [id])
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId])
+  @@index([blockedId])
+}
