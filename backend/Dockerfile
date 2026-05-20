@@ -1,4 +1,5 @@
-FROM node:20-alpine
+FROM node:20-alpine AS builder
+RUN apk add --no-cache openssl
 
 WORKDIR /app
 
@@ -10,6 +11,16 @@ RUN npx prisma generate
 
 COPY . .
 
+# Production stage
+FROM node:20-alpine
+RUN apk add --no-cache openssl dumb-init
+
+WORKDIR /app
+COPY --from=builder /app .
+
+ENV NODE_ENV=production
+
 EXPOSE 4000
 
-CMD ["node", "src/index.js"]
+# Use dumb-init to properly handle signals in container
+CMD ["dumb-init", "node", "src/index.js"]

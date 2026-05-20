@@ -1,17 +1,16 @@
-version: '3.8'
 services:
   postgres:
     image: postgres:15
     environment:
       POSTGRES_DB: proximitychat
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: pass
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 123456
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d proximitychat"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d proximitychat"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -20,6 +19,9 @@ services:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+    volumes:
+      - redisdata:/data
+    command: redis-server --appendonly yes
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -36,7 +38,21 @@ services:
       redis:
         condition: service_healthy
     env_file: ./backend/.env
-    command: sh -c "npx prisma migrate deploy && node src/index.js"
+    environment:
+      DATABASE_URL: postgresql://postgres:123456@postgres:5432/proximitychat
+      REDIS_URL: redis://redis:6379
+    command: sh -c "npx prisma db push && node src/index.js"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./mobile
+      dockerfile: Dockerfile.web
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
 
 volumes:
   pgdata:
+  redisdata:
