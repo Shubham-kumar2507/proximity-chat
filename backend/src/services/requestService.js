@@ -18,7 +18,7 @@ async function sendRequest(senderId, data) {
   if (message.length > 100) {
     throw { status: 400, message: 'Icebreaker message must be 100 characters or less' };
   }
-  if (topicTag && !['music', 'hangout', 'networking', 'general'].includes(topicTag)) {
+  if (topicTag && !['music', 'hangout', 'networking', 'gaming', 'travel', 'other', 'general'].includes(topicTag)) {
     throw { status: 400, message: 'Invalid topic tag' };
   }
   const receiver = await prisma.user.findUnique({
