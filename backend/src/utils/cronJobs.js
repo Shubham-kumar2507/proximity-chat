@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const prisma = require('./prisma');
 const { getSocketIO } = require('../socket/socketServer');
+const { notifyRequestExpiry } = require('../services/notificationService');
 
 /**
  * Initialize all cron jobs
@@ -10,6 +11,19 @@ function initCronJobs() {
   cron.schedule('* * * * *', async () => {
     try {
       const now = new Date();
+
+      // Notify requests about to expire (2 minutes warning)
+      const soonExpiring = await prisma.chatRequest.findMany({
+        where: {
+          status: 'pending',
+          expiresAt: { gt: now, lte: new Date(now.getTime() + 2 * 60 * 1000) },
+        },
+        select: { id: true, senderId: true, receiverId: true },
+      });
+      for (const req of soonExpiring) {
+        notifyRequestExpiry(req.receiverId, req.id).catch(() => {});
+      }
+
       const expiredRequests = await prisma.chatRequest.findMany({
         where: {
           status: 'pending',
@@ -44,6 +58,7 @@ function initCronJobs() {
   });
 
   // Expire chats that have passed their 24hr window - check every minute
+  // Respects savedChat flag: don't delete messages if either participant saved
   cron.schedule('* * * * *', async () => {
     try {
       const now = new Date();
@@ -53,7 +68,7 @@ function initCronJobs() {
           expiresAt: { lte: now },
         },
         include: {
-          participants: { select: { userId: true } },
+          participants: { select: { userId: true, savedChat: true } },
         },
       });
 
@@ -69,8 +84,15 @@ function initCronJobs() {
             io.to(`chat:${chat.id}`).emit('chat:expired', { chatId: chat.id });
           }
 
-          // Delete messages first (cascade), then mark chat inactive
-          await prisma.message.deleteMany({ where: { chatId: chat.id } });
+          // Check if anyone saved the chat
+          const anySaved = chat.participants.some(p => p.savedChat);
+
+          if (!anySaved) {
+            // Delete messages if nobody saved
+            await prisma.message.deleteMany({ where: { chatId: chat.id } });
+          }
+
+          // Mark chat inactive regardless
           await prisma.chat.update({
             where: { id: chat.id },
             data: { isActive: false },
@@ -81,6 +103,28 @@ function initCronJobs() {
       }
     } catch (err) {
       console.error('Cron: expire chats error:', err.message);
+    }
+  });
+
+  // Permanently delete soft-deleted posts older than 60 seconds (CDN purge window)
+  cron.schedule('* * * * *', async () => {
+    try {
+      const cutoff = new Date(Date.now() - 60 * 1000);
+      const deletedPosts = await prisma.post.findMany({
+        where: { deletedAt: { lte: cutoff } },
+        select: { id: true },
+      });
+
+      if (deletedPosts.length > 0) {
+        // Delete related data first
+        const postIds = deletedPosts.map(p => p.id);
+        await prisma.postComment.deleteMany({ where: { postId: { in: postIds } } });
+        await prisma.postLike.deleteMany({ where: { postId: { in: postIds } } });
+        await prisma.post.deleteMany({ where: { id: { in: postIds } } });
+        console.log(`🗑️  Hard-deleted ${deletedPosts.length} posts`);
+      }
+    } catch (err) {
+      console.error('Cron: hard-delete posts error:', err.message);
     }
   });
 
