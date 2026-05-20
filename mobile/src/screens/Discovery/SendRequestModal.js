@@ -6,6 +6,9 @@ const TOPICS = [
   { id: 'music', label: '🎵 Music' },
   { id: 'hangout', label: '☕ Hangout' },
   { id: 'networking', label: '💼 Networking' },
+  { id: 'gaming', label: '🎮 Gaming' },
+  { id: 'travel', label: '✈️ Travel' },
+  { id: 'other', label: '🔮 Other' },
   { id: 'general', label: '💬 General' },
 ];
 

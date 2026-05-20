@@ -54,7 +54,10 @@ export default function RequestsScreen({ navigation }) {
           <Text style={styles.topicText}>
             {item.topicTag === 'music' ? '🎵 Music' : 
              item.topicTag === 'hangout' ? '☕ Hangout' : 
-             item.topicTag === 'networking' ? '💼 Networking' : '💬 General'}
+             item.topicTag === 'networking' ? '💼 Networking' :
+             item.topicTag === 'gaming' ? '🎮 Gaming' :
+             item.topicTag === 'travel' ? '✈️ Travel' :
+             item.topicTag === 'other' ? '🔮 Other' : '💬 General'}
           </Text>
         </View>
 
@@ -65,10 +68,13 @@ export default function RequestsScreen({ navigation }) {
             <Text style={styles.acceptText}>✅ Accept</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.actionBtn, styles.declineBtn]} onPress={() => handleRespond(item.id, 'decline')}>
-            <Text style={styles.declineText}>❌ Decline</Text>
+            <Text style={styles.declineText}>❌ Not Now</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.actionBtn, styles.busyBtn]} onPress={() => handleRespond(item.id, 'decline')}>
+            <Text style={styles.busyText}>⏰ Busy</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.actionBtn, styles.reportBtn]} onPress={() => confirmReport(item.id)}>
-            <Text style={styles.reportText}>🚩 Report</Text>
+            <Text style={styles.reportText}>🚩</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -118,6 +124,8 @@ const styles = StyleSheet.create({
   declineText: { color: '#c53030', fontWeight: 'bold' },
   reportBtn: { backgroundColor: '#edf2f7' },
   reportText: { color: '#4a5568', fontWeight: 'bold' },
+  busyBtn: { backgroundColor: '#fef3c7' },
+  busyText: { color: '#92400e', fontWeight: 'bold' },
   emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   emptyText: { fontSize: 16, color: '#999' },
 });
