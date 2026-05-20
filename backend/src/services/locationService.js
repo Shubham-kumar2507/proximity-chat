@@ -1,10 +1,11 @@
 const h3 = require('h3-js');
 const redis = require('../utils/redis');
 const prisma = require('../utils/prisma');
-const { getFuzzyDistance } = require('../utils/helpers');
+const config = require('../config');
+const { getFuzzyDistance, getAgeRange } = require('../utils/helpers');
 
 const LOCATION_PREFIX = 'location:';
-const LOCATION_TTL = 90; // 90 seconds
+const LOCATION_TTL = 300; // 5 minutes - offline grace period
 const H3_RESOLUTION = 9; // ~174m hexagons
 const K_RING_RADIUS = 2; // covers ~500m
 
@@ -12,20 +13,35 @@ const K_RING_RADIUS = 2; // covers ~500m
  * Update user's location in Redis
  */
 async function updateLocation(userId, latitude, longitude) {
-  if (typeof latitude !== 'number' || typeof longitude !== 'number') {
+  const lat = typeof latitude === 'number' ? latitude : parseFloat(latitude);
+  const lng = typeof longitude === 'number' ? longitude : parseFloat(longitude);
+
+  if (Number.isNaN(lat) || Number.isNaN(lng)) {
     throw { status: 400, message: 'Invalid coordinates' };
   }
 
-  if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
     throw { status: 400, message: 'Coordinates out of range' };
   }
 
-  const h3Index = h3.latLngToCell(latitude, longitude, H3_RESOLUTION);
+  const h3Index = h3.latLngToCell(lat, lng, H3_RESOLUTION);
+
+  const previousRaw = await redis.get(`${LOCATION_PREFIX}${userId}`);
+  if (previousRaw) {
+    try {
+      const previous = JSON.parse(previousRaw);
+      if (previous.h3Index && previous.h3Index !== h3Index) {
+        await redis.srem(`h3:${previous.h3Index}`, userId);
+      }
+    } catch {
+      // ignore corrupt cache entries
+    }
+  }
 
   const locationData = JSON.stringify({
     h3Index,
-    lat: latitude,
-    lng: longitude,
+    lat,
+    lng,
     timestamp: Date.now(),
     userId,
   });
@@ -43,7 +59,25 @@ async function updateLocation(userId, latitude, longitude) {
 /**
  * Get nearby users using H3 k-ring
  */
-async function getNearbyUsers(userId) {
+function validateRadiusKm(user, requestedKm) {
+  const radius = parseFloat(requestedKm) || config.defaultRadiusKm;
+  if (!config.allowedRadiusKm.includes(radius)) {
+    throw { status: 400, message: `Radius must be one of: ${config.allowedRadiusKm.join(', ')}km` };
+  }
+  if (config.premiumRadiusKm.includes(radius) && !user.isPremium) {
+    throw { status: 403, message: 'Premium subscription required for this radius' };
+  }
+  return radius;
+}
+
+async function getNearbyUsers(userId, maxDistanceKm = 0.5) {
+  const viewer = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { locationPaused: true, isPremium: true, discoveryRadiusKm: true },
+  });
+  if (viewer?.locationPaused) {
+    throw { status: 400, message: 'Location is paused. Disable invisible mode to discover users.' };
+  }
   // Get requesting user's location
   const userLocationRaw = await redis.get(`${LOCATION_PREFIX}${userId}`);
   if (!userLocationRaw) {
@@ -53,8 +87,12 @@ async function getNearbyUsers(userId) {
   const userLocation = JSON.parse(userLocationRaw);
   const userH3 = userLocation.h3Index;
 
-  // Get k-ring neighbors (covers ~500m at resolution 9, k=2)
-  const nearbyH3Cells = h3.gridDisk(userH3, K_RING_RADIUS);
+  // Calculate k-ring based on requested distance
+  // H3 res 9 edge length is ~174m. K-ring 1 gives ~348m radius.
+  const kRingRadius = Math.max(1, Math.ceil((maxDistanceKm * 1000) / (174 * 2)));
+
+  // Get k-ring neighbors
+  const nearbyH3Cells = h3.gridDisk(userH3, kRingRadius);
 
   // Get all user IDs in nearby cells
   const pipeline = redis.pipeline();
@@ -118,6 +156,7 @@ async function getNearbyUsers(userId) {
     where: {
       id: { in: filteredUserIds },
       isVerified: true,
+      locationPaused: false,
     },
     select: {
       id: true,
@@ -127,6 +166,7 @@ async function getNearbyUsers(userId) {
       bio: true,
       photoUrl: true,
       vibeStatus: true,
+      interestTags: true,
     },
   });
 
@@ -165,6 +205,8 @@ async function getNearbyUsers(userId) {
         bio: user.bio,
         photoUrl: user.photoUrl,
         vibeStatus: user.vibeStatus,
+        interestTags: user.interestTags,
+        ageRange: getAgeRange(user.age),
         distance,
       };
     });
@@ -172,4 +214,17 @@ async function getNearbyUsers(userId) {
   return nearbyUsers;
 }
 
-module.exports = { updateLocation, getNearbyUsers };
+/**
+ * Surface group nearby event when 5+ users within 500m.
+ * @param {string} userId
+ */
+async function getGroupNearby(userId) {
+  const nearby = await getNearbyUsers(userId, 0.5);
+  return {
+    active: nearby.length >= 5,
+    count: nearby.length,
+    label: nearby.length >= 5 ? 'Group Nearby' : null,
+  };
+}
+
+module.exports = { updateLocation, getNearbyUsers, getGroupNearby, validateRadiusKm };
