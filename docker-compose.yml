@@ -18,7 +18,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "6380:6379"
     volumes:
       - redisdata:/data
     command: redis-server --appendonly yes
@@ -41,13 +41,13 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:123456@postgres:5432/proximitychat
       REDIS_URL: redis://redis:6379
-    command: sh -c "npx prisma db push && node src/index.js"
+    command: sh -c "npx prisma db push --skip-generate && node src/index.js"
     restart: unless-stopped
 
   web:
     build:
-      context: ./mobile
-      dockerfile: Dockerfile.web
+      context: .
+      dockerfile: mobile/Dockerfile.web
     ports:
       - "3000:80"
     depends_on:

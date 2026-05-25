@@ -1,5 +1,6 @@
 const prisma = require('../utils/prisma');
 const { getSocketIO } = require('../socket/socketServer');
+const { applyReportModeration } = require('../utils/moderation');
 
 async function reportUser(reporterId, reportedId, reason) {
   const allowedReasons = ['inappropriate', 'spam', 'harassment', 'other'];
@@ -16,10 +17,7 @@ async function reportUser(reporterId, reportedId, reason) {
     prisma.user.update({ where: { id: reportedId }, data: { reportCount: { increment: 1 } } }),
   ]);
 
-  if (user.reportCount >= 3 && !user.shadowBanned) {
-    await prisma.user.update({ where: { id: reportedId }, data: { shadowBanned: true } });
-    console.log(`🚫 Shadow-banned user ${reportedId}`);
-  }
+  await applyReportModeration(reportedId, user.reportCount);
 
   return report;
 }
@@ -65,11 +63,16 @@ async function getBlockedUsers(userId) {
     where: { blockerId: userId },
     include: { blocked: { select: { id: true, name: true, gender: true, photoUrl: true } } },
   });
-  return blocks.map(b => ({ id: b.id, user: b.blocked, createdAt: b.createdAt || new Date() }));
+  return blocks.map((b) => ({ id: b.id, user: b.blocked, createdAt: b.createdAt }));
 }
 
-async function unblockUser(blockerId, blockedId) {
-  const block = await prisma.block.findFirst({ where: { blockerId, blockedId } });
+async function unblockUser(blockerId, blockIdOrUserId) {
+  const block = await prisma.block.findFirst({
+    where: {
+      blockerId,
+      OR: [{ id: blockIdOrUserId }, { blockedId: blockIdOrUserId }],
+    },
+  });
   if (!block) throw { status: 404, message: 'Block not found' };
   await prisma.block.delete({ where: { id: block.id } });
   return { success: true };

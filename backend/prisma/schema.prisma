@@ -8,36 +8,85 @@ datasource db {
 }
 
 model User {
-  id              String            @id @default(uuid())
-  email           String            @unique
-  name            String            @default("")
-  age             Int               @default(0)
-  gender          String            @default("other") // "male" | "female" | "other"
-  bio             String?
-  photoUrl        String?
-  vibeStatus      String            @default("Open to chat") // "Open to chat" | "Just browsing" | "Busy"
-  isVerified      Boolean           @default(false)
-  shadowBanned    Boolean           @default(false)
-  reportCount     Int               @default(0)
-  fcmToken        String?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-  sentRequests    ChatRequest[]     @relation("sender")
-  receivedRequests ChatRequest[]    @relation("receiver")
-  participations  ChatParticipant[]
-  reports         Report[]          @relation("reporter")
-  blockedUsers    Block[]           @relation("blocker")
-  blockedBy       Block[]           @relation("blocked")
+  id                    String            @id @default(uuid())
+  email                 String            @unique
+  phone                 String?           @unique
+  authProvider          String            @default("email") // email | google | apple | phone
+  providerUserId        String?
+  name                  String            @default("")
+  dateOfBirth           DateTime?
+  age                   Int               @default(0)
+  gender                String            @default("other")
+  bio                   String?
+  photoUrl              String?
+  interestTags          String[]          @default([])
+  vibeStatus            String            @default("Open to chat")
+  isVerified            Boolean           @default(false)
+  isPremium             Boolean           @default(false)
+  profileCompleteness   Int               @default(0)
+  discoveryRadiusKm     Float             @default(0.5)
+  locationPaused        Boolean           @default(false)
+  guidelinesAcceptedAt  DateTime?
+  shadowBanned          Boolean           @default(false)
+  moderationQueue       Boolean           @default(false)
+  reportCount           Int               @default(0)
+  positiveRatingCount   Int               @default(0)
+  negativeRatingCount   Int               @default(0)
+  twoTruths             Json?
+  earnedTitles          Json?
+  activeTitle           String?
+  glanceVideoUrl        String?
+  fcmToken              String?
+  truthsLieIndex        Int?
+
+  // Phase 3 fields
+  favoriteSpot          Json?
+  widgetOrder           Int[]             @default([0, 1, 2, 3])
+  widgetVisibility      Json?
+  spotifyConnected      Boolean           @default(false)
+  spotifyRefreshToken   String?
+
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  sentRequests          ChatRequest[]     @relation("sender")
+  receivedRequests      ChatRequest[]     @relation("receiver")
+  participations        ChatParticipant[]
+  reports               Report[]          @relation("reporter")
+  blockedUsers          Block[]           @relation("blocker")
+  blockedBy             Block[]           @relation("blocked")
+  posts                 Post[]
+  postLikes             PostLike[]
+  postComments          PostComment[]
+  guessesGiven          TruthsGameGuess[] @relation("guesser")
+  guessesReceived       TruthsGameGuess[] @relation("target")
+
+  @@index([providerUserId])
+  @@index([shadowBanned])
+  @@index([moderationQueue])
+}
+
+model TruthsGameGuess {
+  id          String   @id @default(uuid())
+  guesserId   String
+  targetId    String
+  guessedIndex Int
+  correct     Boolean
+  guessedAt   DateTime @default(now())
+  guesser     User     @relation("guesser", fields: [guesserId], references: [id])
+  target      User     @relation("target", fields: [targetId], references: [id])
+
+  @@index([guesserId, targetId])
+  @@index([guessedAt])
 }
 
 model ChatRequest {
   id           String   @id @default(uuid())
   senderId     String
   receiverId   String
-  identityMode String   // "full" | "semi" | "anonymous"
-  message      String   // max 100 chars icebreaker
-  topicTag     String?  // "music" | "hangout" | "networking" | "general"
-  status       String   @default("pending") // "pending" | "accepted" | "declined" | "expired"
+  identityMode String
+  message      String
+  topicTag     String?
+  status       String   @default("pending")
   expiresAt    DateTime
   createdAt    DateTime @default(now())
   sender       User     @relation("sender", fields: [senderId], references: [id])
@@ -52,9 +101,10 @@ model ChatRequest {
 model Chat {
   id           String            @id @default(uuid())
   requestId    String            @unique
-  expiresAt    DateTime          // 24hr from creation
+  expiresAt    DateTime
   createdAt    DateTime          @default(now())
   isActive     Boolean           @default(true)
+  identityRevealed Boolean       @default(false)
   request      ChatRequest       @relation(fields: [requestId], references: [id])
   participants ChatParticipant[]
   messages     Message[]
@@ -63,46 +113,104 @@ model Chat {
 }
 
 model ChatParticipant {
-  id      String @id @default(uuid())
-  chatId  String
-  userId  String
-  chat    Chat   @relation(fields: [chatId], references: [id])
-  user    User   @relation(fields: [userId], references: [id])
+  id         String    @id @default(uuid())
+  chatId     String
+  userId     String
+  lastReadAt DateTime?
+  savedChat  Boolean   @default(false)
+  chat       Chat      @relation(fields: [chatId], references: [id])
+  user       User      @relation(fields: [userId], references: [id])
 
   @@unique([chatId, userId])
   @@index([userId])
 }
 
 model Message {
-  id        String   @id @default(uuid())
-  chatId    String
-  senderId  String
-  content   String
-  createdAt DateTime @default(now())
-  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  id          String    @id @default(uuid())
+  chatId      String
+  senderId    String
+  content     String
+  deliveredAt DateTime?
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+  chat        Chat      @relation(fields: [chatId], references: [id], onDelete: Cascade)
 
   @@index([chatId])
 }
 
 model Report {
-  id           String   @id @default(uuid())
-  reporterId   String
-  reportedId   String
-  reason       String   // "inappropriate" | "spam" | "harassment" | "other"
-  createdAt    DateTime @default(now())
-  reporter     User     @relation("reporter", fields: [reporterId], references: [id])
+  id         String   @id @default(uuid())
+  reporterId String
+  reportedId String
+  reason     String
+  createdAt  DateTime @default(now())
+  reporter   User     @relation("reporter", fields: [reporterId], references: [id])
 
   @@index([reportedId])
+  @@index([createdAt])
 }
 
 model Block {
-  id        String @id @default(uuid())
+  id        String   @id @default(uuid())
   blockerId String
   blockedId String
-  blocker   User   @relation("blocker", fields: [blockerId], references: [id])
-  blocked   User   @relation("blocked", fields: [blockedId], references: [id])
+  createdAt DateTime @default(now())
+  blocker   User     @relation("blocker", fields: [blockerId], references: [id])
+  blocked   User     @relation("blocked", fields: [blockedId], references: [id])
 
   @@unique([blockerId, blockedId])
   @@index([blockerId])
   @@index([blockedId])
+}
+
+model Post {
+  id         String        @id @default(uuid())
+  userId     String
+  content    String
+  topicTag   String?
+  mediaUrl   String?
+  mediaType  String?
+  visibility String        @default("public")
+  radiusKm   Float?
+  h3Index    String?
+  deletedAt  DateTime?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  likes      PostLike[]
+  comments   PostComment[]
+
+  @@index([createdAt])
+  @@index([h3Index])
+  @@index([visibility])
+  @@index([deletedAt])
+}
+
+model PostLike {
+  id        String   @id @default(uuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
+  @@index([userId])
+}
+
+model PostComment {
+  id        String        @id @default(uuid())
+  postId    String
+  userId    String
+  content   String
+  parentId  String?
+  createdAt DateTime      @default(now())
+  post      Post          @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent    PostComment?  @relation("PostCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   PostComment[] @relation("PostCommentReplies")
+
+  @@index([postId])
+  @@index([userId])
+  @@index([parentId])
 }

@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, SafeAreaView, RefreshControl, Alert } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, RefreshControl, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRequestStore } from '../../store/requestStore';
 import { useChatStore } from '../../store/chatStore';
+import ConnectionRequestBadge from '../../components/nearby/ConnectionRequestBadge';
 
 export default function RequestsScreen({ navigation }) {
   const { incomingRequests, fetchIncoming, isLoading, respondToRequest } = useRequestStore();
@@ -36,9 +38,10 @@ export default function RequestsScreen({ navigation }) {
   const renderItem = ({ item }) => {
     const expiresAt = new Date(item.expiresAt).getTime();
     const minsLeft = Math.max(0, Math.floor((expiresAt - timeNow) / 60000));
+    const isSpecial = item.topicTag === 'truths_game';
 
     return (
-      <View style={styles.card}>
+      <View style={[styles.card, isSpecial && styles.specialCard]}>
         <View style={styles.header}>
           <Text style={styles.senderInfo}>
             {item.identityMode === 'full' 
@@ -50,18 +53,29 @@ export default function RequestsScreen({ navigation }) {
           <Text style={styles.timer}>{minsLeft}m left</Text>
         </View>
 
-        <View style={styles.topicBadge}>
-          <Text style={styles.topicText}>
-            {item.topicTag === 'music' ? '🎵 Music' : 
-             item.topicTag === 'hangout' ? '☕ Hangout' : 
-             item.topicTag === 'networking' ? '💼 Networking' :
-             item.topicTag === 'gaming' ? '🎮 Gaming' :
-             item.topicTag === 'travel' ? '✈️ Travel' :
-             item.topicTag === 'other' ? '🔮 Other' : '💬 General'}
-          </Text>
-        </View>
-
-        <Text style={styles.message}>"{item.message}"</Text>
+        {isSpecial ? (
+          <View>
+            <ConnectionRequestBadge />
+            <Text style={styles.specialTitle}>{item.sender.name} guessed your lie correctly!</Text>
+            <View style={styles.quoteBlock}>
+              <Text style={styles.quoteText}>"{item.message}"</Text>
+            </View>
+          </View>
+        ) : (
+          <>
+            <View style={styles.topicBadge}>
+              <Text style={styles.topicText}>
+                {item.topicTag === 'music' ? '🎵 Music' : 
+                 item.topicTag === 'hangout' ? '☕ Hangout' : 
+                 item.topicTag === 'networking' ? '💼 Networking' :
+                 item.topicTag === 'gaming' ? '🎮 Gaming' :
+                 item.topicTag === 'travel' ? '✈️ Travel' :
+                 item.topicTag === 'other' ? '🔮 Other' : '💬 General'}
+              </Text>
+            </View>
+            <Text style={styles.message}>"{item.message}"</Text>
+          </>
+        )}
 
         <View style={styles.actions}>
           <TouchableOpacity style={[styles.actionBtn, styles.acceptBtn]} onPress={() => handleRespond(item.id, 'accept')}>
@@ -93,7 +107,11 @@ export default function RequestsScreen({ navigation }) {
         </View>
       ) : (
         <FlatList
-          data={incomingRequests}
+          data={[...incomingRequests].sort((a, b) => {
+            if (a.topicTag === 'truths_game' && b.topicTag !== 'truths_game') return -1;
+            if (b.topicTag === 'truths_game' && a.topicTag !== 'truths_game') return 1;
+            return 0;
+          })}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={styles.list}
@@ -128,4 +146,8 @@ const styles = StyleSheet.create({
   busyText: { color: '#92400e', fontWeight: 'bold' },
   emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   emptyText: { fontSize: 16, color: '#999' },
+  specialCard: { borderColor: '#ec4899', borderWidth: 1.5, shadowColor: '#ec4899', shadowOpacity: 0.3, shadowRadius: 8 },
+  specialTitle: { fontSize: 15, fontWeight: '700', color: '#111827', marginBottom: 8 },
+  quoteBlock: { backgroundColor: '#f1f5f9', padding: 12, borderRadius: 8, borderLeftWidth: 4, borderLeftColor: '#ec4899', marginBottom: 16 },
+  quoteText: { fontSize: 14, fontStyle: 'italic', color: '#4b5563' },
 });

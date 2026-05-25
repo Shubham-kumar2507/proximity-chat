@@ -1,4 +1,4 @@
-const { verifyToken } = require('../utils/jwt');
+const { verifyAccessToken } = require('../utils/jwt');
 const prisma = require('../utils/prisma');
 
 /**
@@ -16,7 +16,7 @@ async function authMiddleware(req, res, next) {
       return res.status(401).json({ success: false, error: 'Invalid token format' });
     }
 
-    const decoded = verifyToken(token);
+    const decoded = verifyAccessToken(token);
     const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
 
     if (!user) {

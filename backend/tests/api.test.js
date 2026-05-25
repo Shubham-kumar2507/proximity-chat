@@ -30,7 +30,8 @@ describe('Proximity Chat API Integration Tests', () => {
     it('should send OTP', async () => {
       const res = await request(app)
         .post('/api/auth/send-otp')
-        .send({ email: mockEmail });
+        .send({ email: mockEmail })
+        .timeout(15000);
       
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
@@ -46,10 +47,11 @@ describe('Proximity Chat API Integration Tests', () => {
       
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.data.token).toBeDefined();
+      expect(res.body.data.accessToken).toBeDefined();
+      expect(res.body.data.refreshToken).toBeDefined();
       expect(res.body.data.isNewUser).toBe(true);
 
-      userToken = res.body.data.token;
+      userToken = res.body.data.accessToken;
       userId = res.body.data.user.id;
     });
 

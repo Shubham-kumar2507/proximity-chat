@@ -1,0 +1,6 @@
+# Ignore node_modules from both projects
+mobile/node_modules
+mobile/.expo
+backend/node_modules
+.git
+*.md

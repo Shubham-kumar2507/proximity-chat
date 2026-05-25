@@ -26,6 +26,23 @@ A hyper-local, real-time networking and dating application that uses H3 geohashi
 - **Coordinate Blocking**: Real-time regex engines block the sharing of GPS coordinates in chat messages.
 - **Automated Moderation**: 3 reports trigger an invisible, automatic shadow-ban.
 
+## ✅ Newly Added Flows
+- **Google + Apple social login API** (`POST /api/auth/social-login`)
+- **Access + refresh token auth** (`accessToken` 15m, `refreshToken` 7d, `POST /api/auth/refresh`)
+- **Post feed API** with public/proximity visibility:
+  - `POST /api/posts`
+  - `GET /api/posts/feed`
+  - `POST /api/posts/:id/like`
+  - `POST /api/posts/:id/comments`
+  - `GET /api/posts/:id/comments`
+
+## 📋 Feature completion tracker
+
+See **[COMPLETION_CHECKLIST.md](./COMPLETION_CHECKLIST.md)** for:
+- Every required feature (done / partial / missing)
+- **Exactly what credentials you must provide** (Twilio, Firebase, S3, etc.)
+- Production deployment steps
+
 ## 🛠️ Local Development Setup
 
 ### Prerequisites
@@ -39,6 +56,8 @@ A hyper-local, real-time networking and dating application that uses H3 geohashi
 ```bash
 docker-compose up -d postgres redis
 ```
+
+> **Note:** Postgres is exposed on host port **5433** (not 5432) to avoid conflicts with a local PostgreSQL install. Update `backend/.env` if you change this.
 
 2. Navigate to the backend directory:
 ```bash
@@ -77,7 +96,7 @@ npm install
 ```
 
 3. Configure environment variables:
-Copy `.env.example` to `.env`. Ensure your backend IP is accessible from your mobile device or emulator (e.g., change `localhost` to your machine's local IP address if testing on a physical device).
+Copy `.env.example` to `.env`. For a physical device, set `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_SOCKET_URL` to your machine's LAN IP (e.g. `http://192.168.1.50:4000/api`).
 
 4. Start the Expo development server:
 ```bash

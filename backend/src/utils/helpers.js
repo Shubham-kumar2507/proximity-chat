@@ -37,13 +37,16 @@ function containsCoordinates(content) {
  */
 function getFuzzyDistance(h3Index1, h3Index2) {
   const h3 = require('h3-js');
-  const gridDistance = h3.gridDistance(h3Index1, h3Index2);
-
-  if (gridDistance === 0) return '~50m';
-  if (gridDistance === 1) return '~150m';
-  if (gridDistance === 2) return '~300m';
-  if (gridDistance === 3) return '~450m';
-  return '~500m+';
+  try {
+    const gridDistance = h3.gridDistance(h3Index1, h3Index2);
+    if (gridDistance === 0) return '~50m';
+    if (gridDistance === 1) return '~150m';
+    if (gridDistance === 2) return '~300m';
+    if (gridDistance === 3) return '~450m';
+    return '~500m+';
+  } catch {
+    return '~500m';
+  }
 }
 
 /**

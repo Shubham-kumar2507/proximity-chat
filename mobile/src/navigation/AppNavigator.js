@@ -15,10 +15,13 @@ export default function AppNavigator() {
     );
   }
 
-  // User must be authenticated AND have completed their profile to see the main app
-  if (isAuthenticated && isProfileComplete) {
-    return <AppStack />;
+  if (!isAuthenticated) {
+    return <AuthStack />;
   }
 
-  return <AuthStack />;
+  if (!isProfileComplete) {
+    return <AuthStack initialRouteName="ProfileSetup" />;
+  }
+
+  return <AppStack />;
 }

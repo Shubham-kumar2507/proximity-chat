@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../services/api';
+import socketService from '../services/socket';
 
 export const useAuthStore = create((set) => ({
   user: null,
@@ -10,8 +11,8 @@ export const useAuthStore = create((set) => ({
 
   checkAuth: async () => {
     try {
-      const token = await SecureStore.getItemAsync('userToken');
-      if (token) {
+      const accessToken = await AsyncStorage.getItem('accessToken');
+      if (accessToken) {
         const response = await api.get('/users/me');
         if (response.data.success) {
           set({
@@ -29,8 +30,9 @@ export const useAuthStore = create((set) => ({
     set({ user: null, isAuthenticated: false, isProfileComplete: false, isLoading: false });
   },
 
-  login: async (token, userData) => {
-    await SecureStore.setItemAsync('userToken', token);
+  login: async (tokens, userData) => {
+    await AsyncStorage.setItem('accessToken', tokens.accessToken);
+    await AsyncStorage.setItem('refreshToken', tokens.refreshToken);
     set({
       user: userData,
       isAuthenticated: true,
@@ -39,7 +41,16 @@ export const useAuthStore = create((set) => ({
   },
 
   logout: async () => {
-    await SecureStore.deleteItemAsync('userToken');
+    socketService.disconnect();
+    const refreshToken = await AsyncStorage.getItem('refreshToken');
+    if (refreshToken) {
+      try {
+        await api.post('/auth/logout', { refreshToken });
+      } catch {
+        // noop
+      }
+    }
+    await AsyncStorage.multiRemove(['accessToken', 'refreshToken']);
     set({ user: null, isAuthenticated: false, isProfileComplete: false });
   },
 

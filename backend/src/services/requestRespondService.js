@@ -2,6 +2,7 @@ const prisma = require('../utils/prisma');
 const { getAgeRange } = require('../utils/helpers');
 const { getSocketIO } = require('../socket/socketServer');
 const { getFirebaseAdmin } = require('../utils/firebase');
+const { applyReportModeration } = require('../utils/moderation');
 
 async function respondToRequest(userId, requestId, action) {
   const allowed = ['accept', 'decline', 'report'];
@@ -78,9 +79,7 @@ async function respondToRequest(userId, requestId, action) {
       prisma.report.create({ data: { reporterId: userId, reportedId: req.senderId, reason: 'inappropriate' } }),
       prisma.user.update({ where: { id: req.senderId }, data: { reportCount: { increment: 1 } } }),
     ]);
-    if (sender.reportCount >= 3) {
-      await prisma.user.update({ where: { id: req.senderId }, data: { shadowBanned: true } });
-    }
+    await applyReportModeration(req.senderId, sender.reportCount);
     return { request: updated, report };
   }
 }

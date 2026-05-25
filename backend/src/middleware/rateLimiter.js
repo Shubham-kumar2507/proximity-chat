@@ -2,7 +2,7 @@ const rateLimit = require('express-rate-limit');
 
 const rateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // 100 requests per windowMs per IP
+  max: process.env.NODE_ENV === 'production' ? 100 : 1000, // Higher limit for dev
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -17,7 +17,7 @@ const rateLimiter = rateLimit({
 // Stricter rate limit for auth endpoints
 const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
+  max: process.env.NODE_ENV === 'production' ? 20 : 200, // Higher limit for dev
   standardHeaders: true,
   legacyHeaders: false,
   message: {

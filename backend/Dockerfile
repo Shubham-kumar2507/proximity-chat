@@ -4,7 +4,7 @@ RUN apk add --no-cache openssl
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm install --omit=dev
 
 COPY prisma ./prisma/
 RUN npx prisma generate
@@ -13,7 +13,7 @@ COPY . .
 
 # Production stage
 FROM node:20-alpine
-RUN apk add --no-cache openssl dumb-init
+RUN apk add --no-cache openssl dumb-init && npm install -g prisma@5.22.0
 
 WORKDIR /app
 COPY --from=builder /app .

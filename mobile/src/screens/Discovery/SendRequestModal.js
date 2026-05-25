@@ -18,11 +18,19 @@ const MODES = [
   { id: 'anonymous', label: 'Anonymous', desc: 'Shows only your gender' },
 ];
 
-export default function SendRequestModal({ visible, onClose, receiver }) {
-  const [identityMode, setIdentityMode] = useState('semi');
+export default function SendRequestModal({ visible, onClose, receiver, initialTopic, initialMessage }) {
+  const [identityMode, setIdentityMode] = useState('full');
   const [message, setMessage] = useState('');
   const [topicTag, setTopicTag] = useState('general');
   const [loading, setLoading] = useState(false);
+
+  React.useEffect(() => {
+    if (visible) {
+      setTopicTag(initialTopic || 'general');
+      setMessage(initialMessage || '');
+      setIdentityMode('full');
+    }
+  }, [visible, initialTopic, initialMessage]);
 
   const handleSend = async () => {
     if (!message.trim()) {
@@ -88,6 +96,16 @@ export default function SendRequestModal({ visible, onClose, receiver }) {
                 </Text>
               </TouchableOpacity>
             ))}
+            {initialTopic === 'truths_game' && (
+              <TouchableOpacity
+                style={[styles.topicButton, topicTag === 'truths_game' && styles.topicButtonActive]}
+                onPress={() => setTopicTag('truths_game')}
+              >
+                <Text style={[styles.topicText, topicTag === 'truths_game' && styles.topicTextActive]}>
+                  🎭 Lie Detective
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           <View style={styles.messageHeader}>

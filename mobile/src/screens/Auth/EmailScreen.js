@@ -19,7 +19,8 @@ export default function EmailScreen({ navigation }) {
         navigation.navigate('OTP', { email: email.trim().toLowerCase() });
       }
     } catch (error) {
-      Alert.alert('Error', error.response?.data?.error || 'Failed to send OTP');
+      console.error('OTP Error:', error.message, error.code, error.response?.status, error.response?.data);
+      Alert.alert('Error', error.response?.data?.error || error.message || 'Failed to send OTP');
     } finally {
       setLoading(false);
     }
@@ -51,6 +52,26 @@ export default function EmailScreen({ navigation }) {
           ) : (
             <Text style={styles.buttonText}>Send OTP</Text>
           )}
+        </TouchableOpacity>
+
+        <View style={styles.dividerRow}>
+          <View style={styles.divider} />
+          <Text style={styles.dividerText}>or</Text>
+          <View style={styles.divider} />
+        </View>
+
+        <TouchableOpacity
+          style={styles.socialButton}
+          onPress={() => navigation.navigate('SocialLogin', { provider: 'google' })}
+        >
+          <Text style={styles.socialButtonText}>Continue with Google</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.socialButton}
+          onPress={() => navigation.navigate('SocialLogin', { provider: 'apple' })}
+        >
+          <Text style={styles.socialButtonText}>Continue with Apple</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -101,5 +122,25 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  dividerRow: {
+    marginVertical: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  divider: { flex: 1, height: 1, backgroundColor: '#ddd' },
+  dividerText: { color: '#999' },
+  socialButton: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 14,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  socialButtonText: {
+    color: '#333',
+    fontWeight: '600',
   },
 });

@@ -7,6 +7,11 @@ export const useChatStore = create((set, get) => ({
   isLoading: false,
   error: null,
 
+  unreadCount: 0,
+  
+  incrementUnread: () => set((state) => ({ unreadCount: state.unreadCount + 1 })),
+  clearUnread: () => set({ unreadCount: 0 }),
+
   fetchChats: async () => {
     set({ isLoading: true, error: null });
     try {
@@ -40,7 +45,20 @@ export const useChatStore = create((set, get) => ({
 
   addMessage: (chatId, message) => {
     set((state) => {
-      const chatMessages = state.messages[chatId] || [];
+      let chatMessages = state.messages[chatId] || [];
+      if (chatMessages.some((m) => m.id === message.id)) return state;
+
+      if (!String(message.id).startsWith('temp-')) {
+        chatMessages = chatMessages.filter(
+          (m) =>
+            !(
+              String(m.id).startsWith('temp-') &&
+              m.senderId === message.senderId &&
+              m.content === message.content
+            )
+        );
+      }
+
       return {
         messages: {
           ...state.messages,

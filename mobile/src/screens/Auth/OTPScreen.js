@@ -19,20 +19,19 @@ export default function OTPScreen({ route, navigation }) {
     return () => clearInterval(timer);
   }, [countdown]);
 
-  const handleVerify = async () => {
-    const otpString = otp.join('');
-    if (otpString.length !== 6) {
+  const verifyCode = async (code) => {
+    if (code.length !== 6) {
       Alert.alert('Error', 'Please enter a 6-digit OTP');
       return;
     }
 
     setLoading(true);
     try {
-      const response = await api.post('/auth/verify-otp', { email, otp: otpString });
+      const response = await api.post('/auth/verify-otp', { email, otp: code });
       if (response.data.success) {
-        const { token, user, isNewUser } = response.data.data;
-        await login(token, user);
-        
+        const { accessToken, refreshToken, user, isNewUser } = response.data.data;
+        await login({ accessToken, refreshToken }, user);
+
         if (isNewUser) {
           navigation.navigate('ProfileSetup');
         }
@@ -43,6 +42,8 @@ export default function OTPScreen({ route, navigation }) {
       setLoading(false);
     }
   };
+
+  const handleVerify = () => verifyCode(otp.join(''));
 
   const handleResend = async () => {
     try {
@@ -55,12 +56,37 @@ export default function OTPScreen({ route, navigation }) {
   };
 
   const handleChange = (text, index) => {
+    const digits = text.replace(/\D/g, '');
+
+    if (digits.length > 1) {
+      const pasted = digits.slice(0, 6).split('');
+      const newOtp = ['', '', '', '', '', ''];
+      pasted.forEach((d, i) => {
+        newOtp[i] = d;
+      });
+      setOtp(newOtp);
+      const focusIndex = Math.min(pasted.length, 5);
+      inputs.current[focusIndex]?.focus();
+      if (pasted.length === 6) {
+        verifyCode(pasted.join(''));
+      }
+      return;
+    }
+
     const newOtp = [...otp];
-    newOtp[index] = text;
+    newOtp[index] = digits;
     setOtp(newOtp);
 
-    if (text && index < 5) {
-      inputs.current[index + 1].focus();
+    if (digits && index < 5) {
+      inputs.current[index + 1]?.focus();
+    }
+
+    if (index === 5 && digits) {
+      const full = [...newOtp];
+      full[5] = digits;
+      if (full.every((d) => d)) {
+        verifyCode(full.join(''));
+      }
     }
   };
 
@@ -83,7 +109,7 @@ export default function OTPScreen({ route, navigation }) {
               ref={ref => inputs.current[index] = ref}
               style={styles.otpInput}
               keyboardType="number-pad"
-              maxLength={1}
+              maxLength={6}
               value={digit}
               onChangeText={(text) => handleChange(text, index)}
               onKeyPress={(e) => handleKeyPress(e, index)}

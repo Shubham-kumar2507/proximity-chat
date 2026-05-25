@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, SafeAreaView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Flag, Ban } from 'lucide-react-native';
 import socketService from '../../services/socket';
 import { useChatStore } from '../../store/chatStore';
@@ -8,7 +9,7 @@ import api from '../../services/api';
 
 export default function ChatScreen({ route, navigation }) {
   const { chatId } = route.params;
-  const { messages, fetchMessages, addMessage } = useChatStore();
+  const { messages, fetchMessages, addMessage, clearUnread } = useChatStore();
   const { user } = useAuthStore();
   const [inputText, setInputText] = useState('');
   const [chatDetails, setChatDetails] = useState(null);
@@ -17,19 +18,28 @@ export default function ChatScreen({ route, navigation }) {
   const chatMessages = messages[chatId] || [];
 
   useEffect(() => {
+    clearUnread();
     loadChat();
-    socketService.connect();
+    
+    const setupSocket = async () => {
+      try {
+        await socketService.connect();
+        socketService.emit('chat:join', { chatId });
 
-    socketService.emit('chat:join', { chatId });
+        socketService.on('chat:message', (msg) => {
+          addMessage(chatId, msg);
+        });
 
-    socketService.on('chat:message', (msg) => {
-      addMessage(chatId, msg);
-    });
-
-    socketService.on('chat:expired', () => {
-      Alert.alert('Chat Ended', 'This chat has reached its 24-hour limit.');
-      navigation.goBack();
-    });
+        socketService.on('chat:expired', () => {
+          Alert.alert('Chat Ended', 'This chat has reached its 24-hour limit.');
+          navigation.goBack();
+        });
+      } catch (err) {
+        console.error('Socket setup failed:', err);
+      }
+    };
+    
+    setupSocket();
 
     return () => {
       socketService.emit('chat:leave', { chatId });
@@ -44,16 +54,29 @@ export default function ChatScreen({ route, navigation }) {
   };
 
   const handleSend = () => {
-    if (!inputText.trim()) return;
-    
-    // Basic client-side block for coordinates (also checked on server)
-    if (inputText.match(/[-+]?\d{1,3}\.\d{4,},\s*[-+]?\d{1,3}\.\d{4,}/)) {
+    const content = inputText.trim();
+    if (!content) return;
+
+    if (content.match(/[-+]?\d{1,3}\.\d{4,},\s*[-+]?\d{1,3}\.\d{4,}/)) {
       Alert.alert('Blocked', 'Sharing exact coordinates is not allowed for safety reasons.');
       return;
     }
 
-    socketService.emit('chat:message', { chatId, content: inputText.trim() });
+    const optimistic = {
+      id: `temp-${Date.now()}`,
+      chatId,
+      senderId: user.id,
+      content,
+      createdAt: new Date().toISOString(),
+    };
+    addMessage(chatId, optimistic);
     setInputText('');
+
+    socketService.emit('chat:message', { chatId, content }, (response) => {
+      if (response && !response.success) {
+        Alert.alert('Error', response.error || 'Failed to send message');
+      }
+    });
   };
 
   const handleReport = () => {
@@ -123,7 +146,7 @@ export default function ChatScreen({ route, navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {chatDetails?.isActive === false && (
         <View style={styles.banner}>
           <Text style={styles.bannerText}>This chat has ended</Text>
@@ -150,12 +173,12 @@ export default function ChatScreen({ route, navigation }) {
             value={inputText}
             onChangeText={setInputText}
             multiline
-            editable={chatDetails?.isActive}
+            editable={chatDetails?.isActive !== false}
           />
           <TouchableOpacity 
             style={[styles.sendButton, (!inputText.trim() || chatDetails?.isActive === false) && styles.sendButtonDisabled]} 
             onPress={handleSend}
-            disabled={!inputText.trim() || chatDetails?.isActive === false}
+            disabled={!inputText.trim() || chatDetails?.isActive === false || !chatDetails}
           >
             <Text style={styles.sendButtonText}>Send</Text>
           </TouchableOpacity>
