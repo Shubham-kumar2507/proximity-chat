@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   content: { flex: 1, justifyContent: 'center', padding: 24 },
   title: { fontSize: 28, fontWeight: '700', color: '#222', marginBottom: 8, textAlign: 'center' },
-  subtitle: { fontSize: 14, color: '#666', marginBottom: 24, textAlign: 'center' },
+  subtitle: { fontSize: 16, color: '#444', marginBottom: 24, textAlign: 'center', fontStyle: 'italic' },
   input: {
     borderWidth: 1,
     borderColor: '#ddd',
@@ -94,10 +94,15 @@ const styles = StyleSheet.create({
   },
   button: {
     marginTop: 4,
-    backgroundColor: '#6C63FF',
+    backgroundColor: '#10B981', // Changed to vibrant Emerald Green
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: 'center',
+    shadowColor: '#10B981',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 4,
   },
-  buttonText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  buttonText: { color: '#fff', fontWeight: '800', fontSize: 16, textTransform: 'uppercase' },
 });
