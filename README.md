@@ -1,119 +1,127 @@
-# Proximity Chat
+# Proximity Chat - AI DevSecOps App
 
-A hyper-local, real-time networking and dating application that uses H3 geohashing to connect people within a 500m radius.
+A hyper-local, real-time networking and dating application that uses H3 geohashing to connect people within a 500m radius. This project serves as a comprehensive **DevSecOps** demonstration, implementing strict CI/CD pipelines, automated security scanning, container orchestration, and real-time observability.
 
-## 🚀 Tech Stack
+---
 
-### Backend
-- **Node.js + Express**: RESTful API and WebSocket server
-- **PostgreSQL + Prisma**: Persistent storage for users, chats, and relationships
-- **Redis**: High-performance geospatial caching and ephemeral state
-- **Socket.io**: Real-time messaging and live events
-- **Uber H3**: Hexagonal hierarchical spatial index for privacy-preserving location matching
-- **Firebase**: Push notifications and photo storage
-- **Docker**: Containerization and deployment
+## 📖 About the Project
 
-### Mobile App
-- **React Native (Expo)**: Cross-platform mobile development
-- **Zustand**: Global state management
-- **React Navigation**: Complex routing and flow management
-- **Lucide Icons**: Clean vector iconography
+**Proximity Chat** is built with privacy and security at its core. Instead of tracking exact GPS coordinates, the application uses **Uber's H3 Hexagonal Hierarchical Spatial Index** to map users to approximate geographic zones. 
 
-## 🔒 Safety & Privacy First
-- **Zero Coordinate Persistence**: Exact GPS coordinates are never stored in the database. They live temporarily in Redis and are mapped to H3 hexagons.
-- **Fuzzy Distances**: Users only see relative distances (e.g., "~150m away"), never a map pin.
-- **Auto-expiring Sessions**: Chat requests expire in 10 minutes; active chats self-destruct after 24 hours.
-- **Coordinate Blocking**: Real-time regex engines block the sharing of GPS coordinates in chat messages.
-- **Automated Moderation**: 3 reports trigger an invisible, automatic shadow-ban.
+### Key Features:
+- **Zero Coordinate Persistence**: Exact GPS coordinates are never stored; they are mapped to H3 hexagons and kept temporarily in Redis.
+- **Real-Time Connections**: Socket.io enables instant messaging and live location-based event broadcasting.
+- **Privacy First**: Users see fuzzy distances ("~150m away") and regex engines block sharing precise coordinates in chat.
+- **Social & Gamification**: Google/Apple authentication, feed posts, neighborhood titles, and "Two Truths and a Lie" widgets.
 
-## ✅ Newly Added Flows
-- **Google + Apple social login API** (`POST /api/auth/social-login`)
-- **Access + refresh token auth** (`accessToken` 15m, `refreshToken` 7d, `POST /api/auth/refresh`)
-- **Post feed API** with public/proximity visibility:
-  - `POST /api/posts`
-  - `GET /api/posts/feed`
-  - `POST /api/posts/:id/like`
-  - `POST /api/posts/:id/comments`
-  - `GET /api/posts/:id/comments`
+### Core Tech Stack:
+- **Backend:** Node.js, Express, Socket.io, Prisma ORM
+- **Frontend:** React Native (Expo), Zustand
+- **Database:** PostgreSQL (Persistent), Redis (Ephemeral/Geospatial)
+- **DevSecOps:** Docker, Jenkins, Prometheus, Grafana, Trivy
 
-## 📋 Feature completion tracker
+---
 
-See **[COMPLETION_CHECKLIST.md](./COMPLETION_CHECKLIST.md)** for:
-- Every required feature (done / partial / missing)
-- **Exactly what credentials you must provide** (Twilio, Firebase, S3, etc.)
-- Production deployment steps
+## 🐳 The Docker Architecture
+
+The application is fully containerized and orchestrated using `docker-compose`. The architecture consists of the following microservices:
+
+1. **`postgres`**: Runs PostgreSQL 15. Stores persistent user data, chat histories, relationships, and application states. Volume mapped for data persistence.
+2. **`redis`**: Runs Redis 7. Handles high-speed geospatial queries, WebSocket pub/sub messaging, and temporary session data.
+3. **`backend`**: Custom Node.js image. Connects to Postgres and Redis. Automatically runs `prisma db push` on startup to ensure database schema synchronization.
+4. **`web`**: Serves the mobile/web application bundle.
+5. **`prometheus`**: Scrapes performance metrics (CPU, Memory, API request times) directly from the backend.
+6. **`grafana`**: Provides visual dashboards for application health and log monitoring. It is automatically provisioned to connect to Prometheus on boot.
+
+---
+
+## 🧪 The Testing Process & QA Strategy
+
+Quality assurance and security are enforced at multiple layers before any code reaches deployment. This project follows a "Shift-Left" testing approach, where security and functionality are verified as early as possible in the development lifecycle.
+
+### 1. Unit Testing (Functionality)
+- **What it tests:** Individual, isolated functions such as the Uber H3 geohashing logic, distance calculation algorithms, and JWT token generation.
+- **Tools used:** Jest.
+- **Execution:** Runs instantly on every code commit. Ensures core business logic remains intact when refactoring.
+
+### 2. Integration Testing (API & Database)
+- **What it tests:** The connection between the Node.js Express server, the PostgreSQL database, and the Redis cache. Validates critical flows like user registration, authentication (Google/Apple login), WebSocket (Socket.io) event emissions, and feed post creation.
+- **Tools used:** Jest, Supertest.
+- **Execution:** `npm test` inside the backend directory. Requires a test database instance to verify Prisma ORM transactions.
+
+### 3. End-to-End (E2E) Testing (Mobile Experience)
+- **What it tests:** Simulates real user behavior on the React Native mobile app. This includes navigating through the UI, entering OTPs, interacting with the "Two Truths and a Lie" widgets, and rendering the dynamic feed.
+- **Tools used:** Detox or Appium.
+- **Execution:** Runs against a staging environment before final production releases to guarantee the user journey is flawless.
+
+### 4. Static Application Security Testing (SAST)
+- **What it tests:** Analyzes the source code and dependencies for known security flaws (CVEs), outdated packages, or bad coding practices (such as hardcoded secrets).
+- **Tools used:** `npm audit` (integrated into Pipeline stage 2), SonarQube.
+- **Execution:** The Jenkins pipeline will automatically block the build if high or critical vulnerabilities are found in the project dependencies.
+
+### 5. Container & OS Vulnerability Scanning
+- **What it tests:** Scans the compiled Docker images (`backend:latest`, `web:latest`) layer-by-layer. Checks the underlying base OS image (e.g., Debian/Alpine), the Node.js runtime environment, and system binaries for exploits.
+- **Tools used:** AquaSec Trivy.
+- **Execution:** The Jenkins pipeline executes Trivy via the Docker daemon. The pipeline will fail if unresolved OS-level critical vulnerabilities are detected before deployment.
+
+---
+
+## ⚙️ The DevSecOps (CI/CD) Process
+
+The project utilizes a declarative **Jenkinsfile** to define a strict, automated DevSecOps pipeline. The pipeline executes in the following stages:
+
+1. **Checkout Code:** Pulls the latest commits from the source control repository.
+2. **Scan Dependencies:** Runs high-level dependency audits on the Node.js environment.
+3. **Run Automated Tests:** Installs dependencies and runs integration tests.
+4. **Build Docker Containers:** Executes `docker-compose build` to create fresh, immutable container images for the backend and frontend.
+5. **Scan Containers:** Runs Trivy against the newly built images to ensure they meet security compliance (Zero Critical vulnerabilities).
+6. **Manual Approval Gate:** The pipeline pauses. A DevOps engineer or release manager must manually click "Approve" in the Jenkins UI to authorize the release.
+7. **Deploy:** Executes the deployment sequence to the target environment.
+
+---
+
+## 🚀 The Deployment Process
+
+Deployment is fully automated but gated by human approval to ensure maximum safety.
+
+### 1. Pre-Deployment Configuration
+Environment variables (`DATABASE_URL`, `REDIS_URL`, API Keys) are injected securely into the Docker environment. Secrets are kept out of source control.
+
+### 2. Zero-Downtime Database Migrations
+When the backend container boots up, its entrypoint command is:
+`sh -c "npx prisma db push --skip-generate && node src/index.js"`
+This ensures that the database schema is seamlessly updated to match the new application code before the Node.js server starts accepting traffic.
+
+### 3. Container Orchestration
+The deployment stage runs `docker-compose up -d`, which gracefully shuts down old containers and replaces them with the newly built, security-scanned versions. The application instantly resumes with the updated state.
+
+### 4. Observability & Monitoring
+Post-deployment, **Prometheus** immediately begins scraping metrics from the newly deployed containers. Operations teams use **Grafana** (accessible on port `3001`) to monitor CPU usage, memory leaks, and API response times in real-time.
+
+---
 
 ## 🛠️ Local Development Setup
 
-### Prerequisites
-- Node.js (v18+)
-- Docker and Docker Compose
-- Expo CLI (`npm i -g expo-cli`)
+To run the full stack locally:
 
-### 1. Backend Setup
+1. **Start the Infrastructure (Databases & Monitoring):**
+   ```bash
+   docker-compose up -d postgres redis prometheus grafana
+   ```
 
-1. Navigate to the root directory and start the infrastructure:
-```bash
-docker-compose up -d postgres redis
-```
+2. **Start the Backend:**
+   ```bash
+   cd backend
+   npm install
+   cp .env.example .env  # Add your variables
+   npm run dev
+   ```
 
-> **Note:** Postgres is exposed on host port **5433** (not 5432) to avoid conflicts with a local PostgreSQL install. Update `backend/.env` if you change this.
+3. **Start the Mobile App:**
+   ```bash
+   cd mobile
+   npm install
+   npm start
+   ```
 
-2. Navigate to the backend directory:
-```bash
-cd backend
-```
-
-3. Install dependencies:
-```bash
-npm install
-```
-
-4. Configure environment variables:
-Copy `.env.example` to `.env`. The database and redis URLs are pre-configured for docker-compose. Add your Firebase credentials if you want to test push notifications and photo uploads (otherwise it will fall back to mock mode).
-
-5. Run Prisma migrations:
-```bash
-npm run migrate
-```
-
-6. Start the development server:
-```bash
-npm run dev
-```
-The server will start on `http://localhost:4000`.
-
-### 2. Mobile Setup
-
-1. Open a new terminal and navigate to the mobile directory:
-```bash
-cd mobile
-```
-
-2. Install dependencies:
-```bash
-npm install
-```
-
-3. Configure environment variables:
-Copy `.env.example` to `.env`. For a physical device, set `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_SOCKET_URL` to your machine's LAN IP (e.g. `http://192.168.1.50:4000/api`).
-
-4. Start the Expo development server:
-```bash
-npm start
-```
-Use the Expo Go app on your phone, or press `i` for iOS simulator / `a` for Android emulator.
-
-## 🧪 Testing
-
-To run the backend integration tests:
-```bash
-cd backend
-npm test
-```
-
-## 📦 Deployment (Render/Railway ready)
-The `docker-compose.yml` and `backend/Dockerfile` are production-ready.
-1. Spin up a managed PostgreSQL and Redis instance.
-2. Deploy the `backend/Dockerfile`.
-3. The entrypoint automatically runs `npx prisma migrate deploy` before starting the server.
+*(For detailed feature tracking and API requirements, see `COMPLETION_CHECKLIST.md`)*

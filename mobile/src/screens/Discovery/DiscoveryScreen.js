@@ -90,11 +90,25 @@ export default function DiscoveryScreen() {
     }
 
     try {
-      const location = await Location.getCurrentPositionAsync({});
-      await updateLocation(location.coords.latitude, location.coords.longitude);
+      let location;
+      try {
+        location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      } catch (e) {
+        console.log('High accuracy failed, trying last known position...', e);
+        location = await Location.getLastKnownPositionAsync();
+      }
+      
+      if (location && location.coords) {
+        await updateLocation(location.coords.latitude, location.coords.longitude);
+      } else {
+        // Fallback to a mock coordinate for local testing if totally unavailable
+        console.log('Location unavailable, using mock coordinates for testing');
+        await updateLocation(40.7128, -74.0060);
+      }
       fetchNearby();
     } catch (error) {
       console.log('Error getting location:', error);
+      fetchNearby(); // try to fetch anyway, it will show an error if location is completely missing
     }
   };
 

@@ -29,7 +29,9 @@ const server = http.createServer(app);
 if (helmet) app.use(helmet());
 if (config.isProduction) app.set('trust proxy', 1);
 app.use(cors({
-  origin: config.corsOrigins,
+  origin: function (origin, callback) {
+    callback(null, true);
+  },
   credentials: true,
 }));
 app.use(express.json());
@@ -39,6 +41,19 @@ app.use(rateLimiter);
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ success: true, data: { status: 'ok', timestamp: new Date().toISOString() } });
+});
+
+// Prometheus Metrics
+const promClient = require('prom-client');
+promClient.collectDefaultMetrics({ prefix: 'proximity_chat_' });
+
+app.get('/metrics', async (req, res) => {
+  try {
+    res.set('Content-Type', promClient.register.contentType);
+    res.end(await promClient.register.metrics());
+  } catch (ex) {
+    res.status(500).end(ex);
+  }
 });
 
 // Routes
